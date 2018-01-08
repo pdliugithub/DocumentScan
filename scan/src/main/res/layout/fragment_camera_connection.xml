@@ -1,0 +1,109 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!--  Texture view display the camera output resource of image-->
+    <TextureView
+        android:id="@+id/texture_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:keepScreenOn="true" />
+
+    <!-- 浮层绘制 -->
+    <com.rossia.life.scan.tensor.widget.OverlayView
+        android:id="@+id/tracking_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!--遮罩层： -->
+    <com.rossia.life.scan.ui.view.DrawColorView
+        android:id="@+id/draw_color_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 闪光灯 -->
+    <ImageView
+        android:id="@+id/scan_flash_img"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="@dimen/dimen_20dp"
+        android:padding="10dp"
+        android:src="@mipmap/scan_flash_off" />
+
+    <ImageView
+        android:id="@+id/take_picture_btn"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="@dimen/dimen_20dp"
+        android:background="@drawable/bg_take_picture" />
+
+    <Switch
+        android:id="@+id/auto_take_picture_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@+id/take_picture_btn"
+        android:background="@drawable/bg_auto_take_pick"
+        android:padding="@dimen/dimen_10dp"
+        android:shadowColor="#00ff00"
+        android:switchPadding="@dimen/dimen_5dp"
+        android:text="自动拍"
+        android:textColor="@color/white" />
+
+    <Switch
+        android:id="@+id/shutter_sound_take_picture_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:layout_alignTop="@id/scan_flash_img"
+        android:background="@drawable/bg_auto_take_pick"
+        android:checked="true"
+        android:padding="@dimen/dimen_10dp"
+        android:shadowColor="#00ff00"
+        android:switchPadding="@dimen/dimen_5dp"
+        android:text="拍照声音"
+        android:textColor="@color/white" />
+
+
+    <!-- 拍照后的图片在这里进行预览 -->
+    <ImageView
+        android:id="@+id/preview_take_img"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true" />
+
+    <!-- 大图进行预览页面 -->
+    <LinearLayout
+        android:id="@+id/preview_photo_group"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="20dp"
+        android:background="#FF000000"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/show_back_img"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:rotation="180"
+            android:src="@mipmap/abc_ic_ab_back_mtrl_am_alpha" />
+
+        <com.github.chrisbanes.photoview.PhotoView
+            android:id="@+id/show_img"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical" />
+    </LinearLayout>
+
+    <!-- 拍照后进行扫描动画 -->
+    <com.rossia.life.scan.tensor.widget.ScanImageView
+        android:id="@+id/scan_img"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_centerInParent="true" />
+</RelativeLayout>
