@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <item android:drawable="@drawable/abc_scrubber_control_to_pressed_mtrl_005" android:state_pressed="true"></item>
-    <item android:drawable="@drawable/abc_btn_switch_to_on_mtrl_00001"></item>
-</selector>
