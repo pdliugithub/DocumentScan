@@ -76,30 +76,6 @@
         android:layout_alignParentBottom="true"
         android:layout_alignParentRight="true" />
 
-    <!-- 大图进行预览页面 -->
-    <LinearLayout
-        android:id="@+id/preview_photo_group"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="20dp"
-        android:background="#FF000000"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:id="@+id/show_back_img"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            android:rotation="180"
-            android:src="@mipmap/abc_ic_ab_back_mtrl_am_alpha" />
-
-        <com.github.chrisbanes.photoview.PhotoView
-            android:id="@+id/show_img"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center_vertical" />
-    </LinearLayout>
-
     <!-- 拍照后进行扫描动画 -->
     <com.rossia.life.scan.tensor.widget.ScanImageView
         android:id="@+id/scan_img"

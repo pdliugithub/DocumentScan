@@ -20,10 +20,8 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.util.Size;
-import android.util.SparseIntArray;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
-import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -32,7 +30,6 @@ import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.Toast;
 
-import com.github.chrisbanes.photoview.PhotoView;
 import com.rossia.life.scan.R;
 import com.rossia.life.scan.common.util.CameraUtil;
 import com.rossia.life.scan.common.util.ImageUtil;
@@ -49,9 +46,6 @@ import com.rossia.life.scan.ui.interf.TakePictureCallback;
 import com.rossia.life.scan.ui.view.DrawColorView;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -146,8 +140,6 @@ public class CameraApiFragment extends Fragment {
     /**
      * 大图预览视图
      */
-    private PhotoView mPreviewPhotoView;
-    private ViewGroup mPreviewPhotoGroup;
     private ScanImageView mScanShowImg;
 
     /**
@@ -501,9 +493,6 @@ public class CameraApiFragment extends Fragment {
         mAutoTakePictureSwitch = view.findViewById(R.id.auto_take_picture_switch);
         mShutterSoundTakePictureSwitch = view.findViewById(R.id.shutter_sound_take_picture_switch);
         mPreviewTakeImg = view.findViewById(R.id.preview_take_img);
-        mPreviewPhotoView = view.findViewById(R.id.show_img);
-        ImageView showBackImg = view.findViewById(R.id.show_back_img);
-        mPreviewPhotoGroup = view.findViewById(R.id.preview_photo_group);
         mScanShowImg = view.findViewById(R.id.scan_img);
         mScanShowImg.setVisibility(View.GONE);
         mScanShowImg.setScanCompleteCallback(mScanCompleteCallback);
@@ -513,7 +502,6 @@ public class CameraApiFragment extends Fragment {
         mCameraScanFlashImg.setOnClickListener(mOnClickListener);
         mTakePictureImg.setOnClickListener(mOnClickListener);
         mPreviewTakeImg.setOnClickListener(mOnClickListener);
-        showBackImg.setOnClickListener(mOnClickListener);
 
         //Check listener.
         mAutoTakePictureSwitch.setOnCheckedChangeListener(mOnCheckedChangeListener);
@@ -765,15 +753,9 @@ public class CameraApiFragment extends Fragment {
                  */
                 //大图浏览时，关闭自动拍照
                 mAutoTakePictureSwitch.setChecked(false);
-                mPreviewPhotoGroup.setVisibility(View.VISIBLE);
-                mPreviewPhotoView.setImageBitmap(mTakePictureBitmap);
                 return;
             }
 
-            if (R.id.show_back_img == v.getId()) {
-                mPreviewPhotoGroup.setVisibility(View.GONE);
-                return;
-            }
         }
     };
 
