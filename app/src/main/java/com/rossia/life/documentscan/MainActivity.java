@@ -80,7 +80,9 @@ public class MainActivity extends AppCompatActivity {
         public void onClick(View v) {
 
             if (v.getId() == R.id.show_img) {
-
+                if(mTakePictureBitmap == null){
+                    return;
+                }
                 mPhotoEnhance = new PhotoEnhanceUtil(mTakePictureBitmap);
 
                 mPhotoEnhance.setContrast(255);

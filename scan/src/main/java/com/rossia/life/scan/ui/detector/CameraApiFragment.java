@@ -237,8 +237,6 @@ public class CameraApiFragment extends Fragment {
 
     private Bitmap mCropCopyBitmap;
 
-    private SensorManager mSensorManager;
-    private Sensor mSensor;
 
     /**
      * 记录着检测出的Location Rect 在屏幕上相对应的Location Rect.
@@ -530,13 +528,6 @@ public class CameraApiFragment extends Fragment {
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        //获取传感器管理对象
-        mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
-        //获取传感器类型：加速度类型
-        mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        //为加速度传感器注册监听器
-        mSensorManager.registerListener(mSensorEventListener, mSensor, SensorManager.SENSOR_DELAY_GAME);
-
         mTextureView = view.findViewById(R.id.texture_view);
         mTextureView.setOnClickListener(mOnClickListener);
         mCameraScanFlashImg = view.findViewById(R.id.scan_flash_img);
@@ -589,7 +580,6 @@ public class CameraApiFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        mSensorManager.unregisterListener(mSensorEventListener);
         stopCamera();
     }
 
@@ -999,26 +989,4 @@ public class CameraApiFragment extends Fragment {
         }
     };
 
-    /**
-     * 传感器监听
-     */
-    private SensorEventListener mSensorEventListener = new SensorEventListener() {
-        @Override
-        public void onSensorChanged(SensorEvent event) {
-            float[] values = event.values;
-            StringBuilder sb = new StringBuilder();
-            sb.append("X方向的加速度：");
-            sb.append(values[0]);
-            sb.append("\nY方向的加速度：");
-            sb.append(values[1]);
-            sb.append("\nZ方向的加速度：");
-            sb.append(values[2]);
-            LogUtil.e(TAG_LOG, "SensorEventListener:\t" + sb.toString());
-        }
-
-        @Override
-        public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-        }
-    };
 }
