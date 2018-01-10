@@ -27,8 +27,6 @@ import java.util.Queue;
 /**
  * A tracker wrapping ObjectTracker that also handles non-max suppression and matching existing
  * objects to new detections.
- * Todo:绘制屏幕检测到的一些对象
- * Todo:这里是绘制的边框跟踪器
  *
  * @author pd_liu 2017/12/15.
  *         <p>
@@ -203,7 +201,6 @@ public class MultiBoxTracker {
 
             final float cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f;
 
-            // TODO: 2018/1/4 这里是绘制完成的Callback
             if ("book".equals(recognition.title) && recognition.detectionConfidence >= 0.80f) {
                     /*
                     这里对识别对象、以及识别可信度进行确定
@@ -309,7 +306,6 @@ public class MultiBoxTracker {
             logger.v(
                     "Result! Frame: " + result.getLocation() + " mapped to screen:" + detectionScreenRect);
 
-            // TODO: 2018/1/4 detectionScreenRect 是相对于屏幕的Rectf矩形区域参数：left top right bottom.
 
             LogUtil.e(TAG_LOG, "\tResult! Frame: " + result.getLocation() + "mapped to screen:" + detectionScreenRect);
 
@@ -325,7 +321,6 @@ public class MultiBoxTracker {
 
         if (rectsToTrack.isEmpty()) {
             logger.v("Nothing to track, aborting.");
-            // TODO: 2018/1/4 这里没有检测到任何的事物，进行刷新屏幕的绘制
             LogUtil.e(TAG_LOG, "Nothing to track, aborting.");
             if (mDetectionNothingCallback != null) {
                 mDetectionNothingCallback.call();
