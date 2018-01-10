@@ -226,7 +226,7 @@ public class MultiBoxTracker {
               /*
               绘制识别出来的  对象Title、confidence 【名称、可信度】
                */
-                borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.bottom, labelString);
+                //borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.bottom, labelString);
 
                 if (mOnDrawRectCompleteCallback != null) {
                     mOnDrawRectCompleteCallback.drawRectComplete(trackedPos);
