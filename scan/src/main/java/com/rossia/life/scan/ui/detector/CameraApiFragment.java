@@ -65,8 +65,11 @@ import java.util.List;
  *         点击TextureView，进行自动对焦
  *         当拍照完成后，进行扫描图片效果展示
  *         增加：自动拍照模式下：当识别出来的区域在离屏幕边缘小于 {@link #DETECTION_FROM_EDGE_DISTANCE} 时，视为不准确.
- *         增加：传感器识别如果手机移动，那么就不要进行自动拍照.
+ *         </p>
  *         <p>
+ *         Note:
+ *         拍照使用最大清晰度的照片
+ *         预览使用所支持的最大预览尺寸
  *         </p>
  */
 
@@ -352,7 +355,7 @@ public class CameraApiFragment extends Fragment {
 
 
             //默认预览的图片是被旋转的，需要进行此行代码设置进行纠正
-            mCamera.setDisplayOrientation(90);
+            mCamera.setDisplayOrientation(ScreenUtil.getDisplayOrientation(getActivity()));
 
             try {
                 mCamera.setPreviewTexture(surface);
@@ -893,7 +896,7 @@ public class CameraApiFragment extends Fragment {
 
                 Matrix matrix = new Matrix();
                 //旋转90度.
-                matrix.postRotate(90, width / 2.0f, height / 2.0f);
+                matrix.postRotate(ScreenUtil.getDisplayOrientation(getActivity()), width / 2.0f, height / 2.0f);
                 //旋转正常角度后的Bitmap.
                 Bitmap rotatedBitmap = Bitmap.createBitmap(takePictureSource, 0, 0, width, height, matrix, true);
 

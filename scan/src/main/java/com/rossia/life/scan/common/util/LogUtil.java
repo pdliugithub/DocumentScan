@@ -11,7 +11,7 @@ import android.util.Log;
 
 public final class LogUtil {
 
-    private volatile static boolean sDebug = false;
+    private volatile static boolean sDebug = true;
 
     private LogUtil() {
     }
