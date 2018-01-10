@@ -13,6 +13,10 @@ import java.util.List;
  *         <p>
  *         相机工具类
  *         </p>
+ *         <p>
+ *         获取相机ID {@link #getCameraId()} .
+ *         开启、关闭闪光灯 {@link #startFlash(Camera, boolean)} [Flash为手电筒模式].
+ *         </p>
  */
 
 public final class CameraUtil {
@@ -65,7 +69,7 @@ public final class CameraUtil {
         }
         Camera.Parameters parameters = camera.getParameters();
         if (open) {
-            parameters.setFlashMode(Camera.Parameters.FLASH_MODE_ON);
+            parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
         } else {
             parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
         }

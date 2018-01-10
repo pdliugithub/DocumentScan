@@ -9,14 +9,26 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.github.chrisbanes.photoview.PhotoView;
+import com.rossia.life.scan.common.util.PhotoEnhanceUtil;
 import com.rossia.life.scan.ui.detector.CameraApiFragment;
 import com.rossia.life.scan.ui.interf.TakePictureCallback;
 
+/**
+ * @author pd_liu 2017/1/10.
+ *         <p>
+ *         暂时，自动识别拍照、裁剪。
+ *         </p>
+ */
 public class MainActivity extends AppCompatActivity {
 
     private PhotoView mPhotoView;
 
     private Bitmap mTakePictureBitmap;
+
+    /**
+     * 对图片进行、对比度的加强
+     */
+    private PhotoEnhanceUtil mPhotoEnhance;
 
     // Used to load the 'native-lib' library on application startup.
     static {
@@ -53,6 +65,14 @@ public class MainActivity extends AppCompatActivity {
         });
 
         showImg.setOnClickListener(mOnClick);
+        showImg.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                mPhotoView.setImageBitmap(mTakePictureBitmap);
+                mPhotoView.setVisibility(View.VISIBLE);
+                return false;
+            }
+        });
     }
 
     private View.OnClickListener mOnClick = new View.OnClickListener() {
@@ -60,7 +80,12 @@ public class MainActivity extends AppCompatActivity {
         public void onClick(View v) {
 
             if (v.getId() == R.id.show_img) {
-                mPhotoView.setImageBitmap(mTakePictureBitmap);
+
+                mPhotoEnhance = new PhotoEnhanceUtil(mTakePictureBitmap);
+
+                mPhotoEnhance.setContrast(255);
+                Bitmap source = mPhotoEnhance.handleImage(mPhotoEnhance.Enhance_Contrast);
+                mPhotoView.setImageBitmap(source);
                 mPhotoView.setVisibility(View.VISIBLE);
                 return;
             }

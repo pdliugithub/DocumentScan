@@ -1,6 +1,7 @@
 package com.rossia.life.scan.ui.detector;
 
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -12,6 +13,10 @@ import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.graphics.Typeface;
 import android.hardware.Camera;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -57,6 +62,10 @@ import java.util.List;
  *         <p>
  *         Usage
  *         拍照 {@link #takePicture(RectF)}
+ *         点击TextureView，进行自动对焦
+ *         当拍照完成后，进行扫描图片效果展示
+ *         增加：自动拍照模式下：当识别出来的区域在离屏幕边缘小于 {@link #DETECTION_FROM_EDGE_DISTANCE} 时，视为不准确.
+ *         增加：传感器识别如果手机移动，那么就不要进行自动拍照.
  *         <p>
  *         </p>
  */
@@ -66,6 +75,10 @@ public class CameraApiFragment extends Fragment {
     private static final String TAG_LOG = "CameraApiFragment";
 
     private static final int ROTATION_90 = 90;
+    /**
+     * 识别出来的对象边缘距离屏幕的边缘超过这个值，视为不准确.
+     */
+    private static final int DETECTION_FROM_EDGE_DISTANCE = 50;
 
     /**
      * 渴望的、想得到的预览尺寸
@@ -224,10 +237,14 @@ public class CameraApiFragment extends Fragment {
 
     private Bitmap mCropCopyBitmap;
 
+    private SensorManager mSensorManager;
+    private Sensor mSensor;
+
     /**
      * 记录着检测出的Location Rect 在屏幕上相对应的Location Rect.
      */
     private RectF mDetectScreenLocationRectF;
+    private RectF mPreDetectScreenLocationRectF;
 
 
     /**
@@ -290,7 +307,8 @@ public class CameraApiFragment extends Fragment {
             配置相机的相关参数
              */
             Camera.Parameters parameters = mCamera.getParameters();
-            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            // TODO: 2018/1/9
+            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
 
             //支持的预览的尺寸
             List<Camera.Size> supportCameraSizes = parameters.getSupportedPreviewSizes();
@@ -329,10 +347,11 @@ public class CameraApiFragment extends Fragment {
 
             //设置图片格式
             parameters.setPictureFormat(ImageFormat.JPEG);
-            //设置照片质量[0 - 100 质量依次上升]
-            parameters.setJpegQuality(50);
+            //设置照片质量[0 - 100 质量依次上升](为了达到订单的最大清晰度，设置质量为最大)
+            parameters.setJpegQuality(100);
             parameters.setPictureSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
             mCamera.setParameters(parameters);
+
 
             //默认预览的图片是被旋转的，需要进行此行代码设置进行纠正
             mCamera.setDisplayOrientation(90);
@@ -399,7 +418,7 @@ public class CameraApiFragment extends Fragment {
                 mTakePictureImg.setPressed(false);
             }
             //预览拍照图片视图上展示图片
-            if(mTakePictureCallback != null){
+            if (mTakePictureCallback != null) {
                 mTakePictureCallback.call(mTakePictureBitmap);
             }
             //拍照完成后，重启预览功能.
@@ -427,19 +446,43 @@ public class CameraApiFragment extends Fragment {
             rect 为相对于手机屏幕的识别出的对象位置
              */
             LogUtil.e(TAG_LOG, "识别出对象相对于屏幕位置为：" + rectF);
+            mPreDetectScreenLocationRectF = mDetectScreenLocationRectF;
             mDetectScreenLocationRectF = rectF;
+
+            /*
+            加入识别物体与屏幕的最短距离的限制
+             */
+            if (mDetectScreenLocationRectF.left < DETECTION_FROM_EDGE_DISTANCE
+                    || mDetectScreenLocationRectF.top < DETECTION_FROM_EDGE_DISTANCE) {
+                return false;
+            }
             /*
             这里处理自动拍照、拍照逻辑
              */
             if (mOpenAutoTakePicture) {
-                //自动拍照加入时间限制[三秒拍照一次]
-                long current = System.currentTimeMillis();
-                if (current - mPreTakeTime < TIME_AUTO_TAKE_PICTURE_INTERVAL) {
-                    return false;
+
+                float intervalLeft = Math.abs(mDetectScreenLocationRectF.left - mPreDetectScreenLocationRectF.left);
+                float intervalTop = Math.abs(mDetectScreenLocationRectF.top - mPreDetectScreenLocationRectF.top);
+                float intervalRight = Math.abs(mDetectScreenLocationRectF.right - mPreDetectScreenLocationRectF.right);
+                float intervalBottom = Math.abs(mDetectScreenLocationRectF.bottom - mPreDetectScreenLocationRectF.bottom);
+
+                float interval = 20;
+
+                if (intervalLeft <= interval && intervalTop <= interval && intervalRight <= interval && intervalBottom <= interval) {
+
+                    /*
+                    当两次之间的间隔不小于固定的阀值，才能进行自动拍照的下一步
+                     */
+                    //自动拍照加入时间限制[三秒拍照一次]
+                    long current = System.currentTimeMillis();
+                    if (current - mPreTakeTime < TIME_AUTO_TAKE_PICTURE_INTERVAL) {
+                        return false;
+                    }
+                    //自动拍照
+                    mTakePictureImg.performClick();
+                    mTakePictureImg.setPressed(true);
                 }
-                //自动拍照
-                mTakePictureImg.performClick();
-                mTakePictureImg.setPressed(true);
+
             }
             return false;
         }
@@ -452,7 +495,8 @@ public class CameraApiFragment extends Fragment {
             mDrawColorView.draw(new DrawColorView.DrawColorListener() {
                 @Override
                 public void drawColor(Canvas canvas) {
-                    canvas.drawColor(Color.parseColor("#AA808080"));
+                    // TODO: 2018/1/9  下面遮罩层展示不展示
+//                    canvas.drawColor(Color.parseColor("#AA808080"));
                 }
             });
             return false;
@@ -486,7 +530,15 @@ public class CameraApiFragment extends Fragment {
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        //获取传感器管理对象
+        mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
+        //获取传感器类型：加速度类型
+        mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        //为加速度传感器注册监听器
+        mSensorManager.registerListener(mSensorEventListener, mSensor, SensorManager.SENSOR_DELAY_GAME);
+
         mTextureView = view.findViewById(R.id.texture_view);
+        mTextureView.setOnClickListener(mOnClickListener);
         mCameraScanFlashImg = view.findViewById(R.id.scan_flash_img);
         mTrackingOverlay = view.findViewById(R.id.tracking_overlay);
         mTakePictureImg = view.findViewById(R.id.take_picture_btn);
@@ -513,6 +565,10 @@ public class CameraApiFragment extends Fragment {
     public void onResume() {
         super.onResume();
 
+        startCamera();
+    }
+
+    public void startCamera() {
         mHandlerThread = new HandlerThread("inference");
         mHandlerThread.start();
         mBackgroundHandler = new Handler(mHandlerThread.getLooper());
@@ -522,20 +578,18 @@ public class CameraApiFragment extends Fragment {
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
-
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (mCamera != null) {
-            mCamera.stopPreview();
-        }
+        stopCamera();
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        mSensorManager.unregisterListener(mSensorEventListener);
         stopCamera();
     }
 
@@ -717,7 +771,7 @@ public class CameraApiFragment extends Fragment {
     /**
      * 关闭相机
      */
-    private void stopCamera() {
+    public void stopCamera() {
         if (mCamera != null) {
             mCamera.stopPreview();
             mCamera.setPreviewCallback(null);
@@ -743,7 +797,7 @@ public class CameraApiFragment extends Fragment {
                 /*
                 进行拍照
                  */
-                takePicture(mDetectScreenLocationRectF);
+                takePictureFocus(mDetectScreenLocationRectF);
                 return;
             }
 
@@ -753,6 +807,19 @@ public class CameraApiFragment extends Fragment {
                  */
                 //大图浏览时，关闭自动拍照
                 mAutoTakePictureSwitch.setChecked(false);
+                return;
+            }
+
+            if (mTextureView == v) {
+                /*
+                进行对焦
+                 */
+                mCamera.autoFocus(new Camera.AutoFocusCallback() {
+                    @Override
+                    public void onAutoFocus(boolean success, Camera camera) {
+                        mCamera.cancelAutoFocus();
+                    }
+                });
                 return;
             }
 
@@ -804,13 +871,6 @@ public class CameraApiFragment extends Fragment {
      * @return
      */
     private boolean takePicture(@Nullable final RectF rectF) {
-        if (mProcessTakePictureFlag) {
-            //已经正在拍照中，避免重复操作，不往下进行
-            return false;
-        }
-
-        //标记目前正在拍照中
-        mProcessTakePictureFlag = true;
 
         mCamera.takePicture(new Camera.ShutterCallback() {
             @Override
@@ -873,7 +933,6 @@ public class CameraApiFragment extends Fragment {
 
                 //取消加载进度框
                 mProgressDialog.cancel();
-
                 mScanShowImg.setImageBitmap(mTakePictureBitmap);
                 mScanShowImg.setVisibility(View.VISIBLE);
                 mScanShowImg.startScan();
@@ -884,8 +943,82 @@ public class CameraApiFragment extends Fragment {
         return true;
     }
 
-    public void setTakePictureCallback(TakePictureCallback takePictureCallback){
+    private RectF mFocusPictureRect;
+
+    /**
+     * 拍照前进行自动对焦，对焦完成之后再进行拍照
+     */
+    private boolean takePictureFocus(@Nullable final RectF rectF) {
+        if (mProcessTakePictureFlag) {
+            //已经正在拍照中，避免重复操作，不往下进行
+            return false;
+        }
+
+        //标记目前正在拍照中
+        mProcessTakePictureFlag = true;
+
+        mFocusPictureRect = rectF;
+
+        /*
+            相机的对焦
+             */
+        //Applications should call autoFocus(AutoFocusCallback) to start the focus if focus mode is FOCUS_MODE_AUTO or FOCUS_MODE_MACRO.
+        mCamera.autoFocus(mAutoFocusCallback);
+        return true;
+    }
+
+    public void setTakePictureCallback(TakePictureCallback takePictureCallback) {
         mTakePictureCallback = takePictureCallback;
     }
 
+    private Camera.AutoFocusCallback mAutoFocusCallback = new Camera.AutoFocusCallback() {
+        @Override
+        public void onAutoFocus(boolean success, Camera camera) {
+
+            LogUtil.e(TAG_LOG, "autoFocus:\t" + success);
+            if (success) {
+                mCamera.cancelAutoFocus();
+                takePicture(mFocusPictureRect);
+
+            } else {
+                //对焦失败，继续对焦
+            }
+        }
+    };
+
+    private Camera.AutoFocusMoveCallback mAutoFocusMoveCallback = new Camera.AutoFocusMoveCallback() {
+        @Override
+        public void onAutoFocusMoving(boolean start, Camera camera) {
+            if (!start) {
+                    /*
+                    对焦结束
+                     */
+                LogUtil.e(TAG_LOG, "autoFocus:\t" + start);
+                takePicture(mFocusPictureRect);
+            }
+        }
+    };
+
+    /**
+     * 传感器监听
+     */
+    private SensorEventListener mSensorEventListener = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            float[] values = event.values;
+            StringBuilder sb = new StringBuilder();
+            sb.append("X方向的加速度：");
+            sb.append(values[0]);
+            sb.append("\nY方向的加速度：");
+            sb.append(values[1]);
+            sb.append("\nZ方向的加速度：");
+            sb.append(values[2]);
+            LogUtil.e(TAG_LOG, "SensorEventListener:\t" + sb.toString());
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+        }
+    };
 }

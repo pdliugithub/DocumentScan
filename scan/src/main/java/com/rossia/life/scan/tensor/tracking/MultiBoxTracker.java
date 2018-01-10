@@ -202,33 +202,41 @@ public class MultiBoxTracker {
             boxPaint.setColor(recognition.color);
 
             final float cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f;
-      /*
-      绘制矩形的圆形边角
-       */
-//      canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint);
-            //获取之前的StrokeWidth保存，
-            float oldStrokeWidth = boxPaint.getStrokeWidth();
-            boxPaint.setStrokeWidth(5f);
-            boxPaint.setColor(Color.YELLOW);
-            canvas.drawRect(trackedPos, boxPaint);
 
-            //恢复之前设置的StrokeWidth
-            boxPaint.setStrokeWidth(oldStrokeWidth);
-            final String labelString =
-                    !TextUtils.isEmpty(recognition.title)
-                            ? String.format("%s %.2f", recognition.title, recognition.detectionConfidence)
-                            : String.format("%.2f", recognition.detectionConfidence);
+            // TODO: 2018/1/4 这里是绘制完成的Callback
+            if ("book".equals(recognition.title) && recognition.detectionConfidence >= 0.80f) {
+                    /*
+                    这里对识别对象、以及识别可信度进行确定
+                     */
+
+                    /*
+                  绘制矩形的圆形边角
+                   */
+                //canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint);
+                //获取之前的StrokeWidth保存，
+                float oldStrokeWidth = boxPaint.getStrokeWidth();
+                boxPaint.setStrokeWidth(5f);
+                boxPaint.setColor(Color.YELLOW);
+                canvas.drawRect(trackedPos, boxPaint);
+
+                //恢复之前设置的StrokeWidth
+                boxPaint.setStrokeWidth(oldStrokeWidth);
+                final String labelString =
+                        !TextUtils.isEmpty(recognition.title)
+                                ? String.format("%s %.2f", recognition.title, recognition.detectionConfidence)
+                                : String.format("%.2f", recognition.detectionConfidence);
 
               /*
               绘制识别出来的  对象Title、confidence 【名称、可信度】
                */
-            //borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.bottom, labelString);
+                borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.bottom, labelString);
 
+                if (mOnDrawRectCompleteCallback != null) {
+                    mOnDrawRectCompleteCallback.drawRectComplete(trackedPos);
+                }
 
-            // TODO: 2018/1/4 这里是绘制完成的Callback
-            if (mOnDrawRectCompleteCallback != null) {
-                mOnDrawRectCompleteCallback.drawRectComplete(trackedPos);
             }
+
         }
     }
 
@@ -319,7 +327,7 @@ public class MultiBoxTracker {
             logger.v("Nothing to track, aborting.");
             // TODO: 2018/1/4 这里没有检测到任何的事物，进行刷新屏幕的绘制
             LogUtil.e(TAG_LOG, "Nothing to track, aborting.");
-            if(mDetectionNothingCallback != null){
+            if (mDetectionNothingCallback != null) {
                 mDetectionNothingCallback.call();
             }
             // TODO: 2018/1/4  注释return仅为测试用
@@ -477,7 +485,7 @@ public class MultiBoxTracker {
         this.mOnDrawRectCompleteCallback = onDrawRectCompleteCallback;
     }
 
-    public void setDetectionNothingCallback(DetectionNothingCallback detectionNothingCallback){
+    public void setDetectionNothingCallback(DetectionNothingCallback detectionNothingCallback) {
         mDetectionNothingCallback = detectionNothingCallback;
     }
 
@@ -494,7 +502,7 @@ public class MultiBoxTracker {
         boolean drawRectComplete(RectF rectF);
     }
 
-    public interface DetectionNothingCallback{
+    public interface DetectionNothingCallback {
         boolean call();
     }
 }
