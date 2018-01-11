@@ -1,7 +1,6 @@
 package com.rossia.life.scan.ui.detector;
 
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -13,17 +12,12 @@ import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.graphics.Typeface;
 import android.hardware.Camera;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.util.Log;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
@@ -65,6 +59,7 @@ import java.util.List;
  *         点击TextureView，进行自动对焦
  *         当拍照完成后，进行扫描图片效果展示
  *         增加：自动拍照模式下：当识别出来的区域在离屏幕边缘小于 {@link #DETECTION_FROM_EDGE_DISTANCE} 时，视为不准确.
+ *         增加：对检测的区域进行反复的学习、检查
  *         </p>
  *         <p>
  *         Note:
@@ -79,9 +74,9 @@ public class CameraApiFragment extends Fragment {
 
     private static final int ROTATION_90 = 90;
     /**
-     * 识别出来的对象边缘距离屏幕的边缘超过这个值，视为不准确.
+     * 识别出来的对象边缘距离屏幕的边缘小于这个值，视为不准确.
      */
-    private static final int DETECTION_FROM_EDGE_DISTANCE = 50;
+    private static final int DETECTION_FROM_EDGE_DISTANCE = 30;
 
     /**
      * 渴望的、想得到的预览尺寸
@@ -240,6 +235,7 @@ public class CameraApiFragment extends Fragment {
 
     private Bitmap mCropCopyBitmap;
 
+    private float mDetectionInterval = 20;
 
     /**
      * 记录着检测出的Location Rect 在屏幕上相对应的Location Rect.
@@ -247,7 +243,12 @@ public class CameraApiFragment extends Fragment {
     private RectF mDetectScreenLocationRectF;
     private RectF mPreDetectScreenLocationRectF;
 
+    /**
+     * 自动拍照时，进行需要计算精度的次数
+     */
+    private int mAutoTakeCalculateNumber;
 
+    private static final int TAKE_CALCULATE_NUMBER = 100;
     /**
      * Callback for android.hardware.Camera API.
      */
@@ -255,7 +256,7 @@ public class CameraApiFragment extends Fragment {
         @Override
         public void onPreviewFrame(final byte[] data, Camera camera) {
 
-            Log.e(TAG_LOG, "\t\t\tonPreviewFrame");
+            LogUtil.e(TAG_LOG, "\t\t\tonPreviewFrame");
 
             if (mIsProcessingFrame) {
                 LogUtil.e(TAG_LOG, "Dropping frame!");
@@ -467,10 +468,18 @@ public class CameraApiFragment extends Fragment {
                 float intervalRight = Math.abs(mDetectScreenLocationRectF.right - mPreDetectScreenLocationRectF.right);
                 float intervalBottom = Math.abs(mDetectScreenLocationRectF.bottom - mPreDetectScreenLocationRectF.bottom);
 
-                float interval = 20;
 
-                if (intervalLeft <= interval && intervalTop <= interval && intervalRight <= interval && intervalBottom <= interval) {
 
+                if (intervalLeft <= mDetectionInterval && intervalTop <= mDetectionInterval && intervalRight <= mDetectionInterval && intervalBottom <= mDetectionInterval) {
+
+                    /*
+                    符合规则，进行计算值加一
+                    当计算值累加到TAKE_CALCULATE_NUMBER时，进行拍照
+                     */
+                    mAutoTakeCalculateNumber ++;
+                    if(mAutoTakeCalculateNumber < TAKE_CALCULATE_NUMBER){
+                        return false;
+                    }
                     /*
                     当两次之间的间隔不小于固定的阀值，才能进行自动拍照的下一步
                      */
@@ -479,9 +488,15 @@ public class CameraApiFragment extends Fragment {
                     if (current - mPreTakeTime < TIME_AUTO_TAKE_PICTURE_INTERVAL) {
                         return false;
                     }
+                    mAutoTakeCalculateNumber = 0;
                     //自动拍照
                     mTakePictureImg.performClick();
                     mTakePictureImg.setPressed(true);
+                }else{
+                    /*
+                    只要有一次不符合规则，就进行重置为0
+                     */
+                    mAutoTakeCalculateNumber = 0;
                 }
 
             }
@@ -497,7 +512,17 @@ public class CameraApiFragment extends Fragment {
                 @Override
                 public void drawColor(Canvas canvas) {
                     // TODO: 2018/1/9  下面遮罩层展示不展示
-//                    canvas.drawColor(Color.parseColor("#AA808080"));
+                    float textSize = 50f;
+                    Paint mPaint = new Paint();
+                    mPaint.setAntiAlias(true);
+                    mPaint.setColor(Color.BLACK);
+                    mPaint.setTextSize(textSize);
+
+                    String tip = "请将识别文档置与屏幕中间，并持续保持";
+
+                    float x = mTextureView.getWidth() / 2f - textSize * tip.length() / 2f;
+                    float y = mTextureView.getHeight() / 2f;
+                    canvas.drawText(tip, x, y, mPaint);
                 }
             });
             return false;
