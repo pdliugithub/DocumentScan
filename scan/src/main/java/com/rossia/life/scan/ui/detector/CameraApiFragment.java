@@ -15,7 +15,6 @@ import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.SystemClock;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Size;
@@ -235,7 +234,7 @@ public class CameraApiFragment extends Fragment {
 
     private Bitmap mCropCopyBitmap;
 
-    private float mDetectionInterval = 20;
+    private float mDetectionInterval = 50;
 
     /**
      * 记录着检测出的Location Rect 在屏幕上相对应的Location Rect.
@@ -248,7 +247,7 @@ public class CameraApiFragment extends Fragment {
      */
     private int mAutoTakeCalculateNumber;
 
-    private static final int TAKE_CALCULATE_NUMBER = 100;
+    private static final int TAKE_CALCULATE_NUMBER = 50;
     /**
      * Callback for android.hardware.Camera API.
      */
@@ -309,7 +308,7 @@ public class CameraApiFragment extends Fragment {
             配置相机的相关参数
              */
             Camera.Parameters parameters = mCamera.getParameters();
-            // TODO: 2018/1/9
+
             parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
 
             //支持的预览的尺寸
@@ -511,14 +510,13 @@ public class CameraApiFragment extends Fragment {
             mDrawColorView.draw(new DrawColorView.DrawColorListener() {
                 @Override
                 public void drawColor(Canvas canvas) {
-                    // TODO: 2018/1/9  下面遮罩层展示不展示
                     float textSize = 50f;
                     Paint mPaint = new Paint();
                     mPaint.setAntiAlias(true);
                     mPaint.setColor(Color.BLACK);
                     mPaint.setTextSize(textSize);
 
-                    String tip = "请将识别文档置与屏幕中间，并持续保持";
+                    String tip = "请将识别文档置与屏幕中间，并减少干扰";
 
                     float x = mTextureView.getWidth() / 2f - textSize * tip.length() / 2f;
                     float y = mTextureView.getHeight() / 2f;
@@ -659,12 +657,10 @@ public class CameraApiFragment extends Fragment {
         runInBackground(new Runnable() {
             @Override
             public void run() {
-
                 /*
                 此为子线程中的操作
                 */
                 LogUtil.e(TAG_LOG, "此为子线程中的操作");
-                final long startTime = SystemClock.uptimeMillis();
                 final List<Classifier.Recognition> results = mTensorFlowObjectDetector.recognizeImage(mCroppedBitmap);
 
                 mCropCopyBitmap = Bitmap.createBitmap(mCroppedBitmap);

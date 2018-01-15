@@ -201,7 +201,7 @@ public class MultiBoxTracker {
 
             final float cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f;
 
-            if ("book".equals(recognition.title) && recognition.detectionConfidence >= 0.80f) {
+            if ("book".equals(recognition.title) && recognition.detectionConfidence >= 0.60f) {
                     /*
                     这里对识别对象、以及识别可信度进行确定
                      */

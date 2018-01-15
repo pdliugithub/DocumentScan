@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 mPhotoEnhance = new PhotoEnhanceUtil(mTakePictureBitmap);
 
-                mPhotoEnhance.setContrast(255);
+                mPhotoEnhance.setContrast(200);
                 Bitmap source = mPhotoEnhance.handleImage(mPhotoEnhance.Enhance_Contrast);
                 mPhotoView.setImageBitmap(source);
                 mPhotoView.setVisibility(View.VISIBLE);

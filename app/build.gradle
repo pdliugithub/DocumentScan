@@ -5,7 +5,7 @@ android {
     defaultConfig {
         applicationId "com.rossia.life.documentscan"
         minSdkVersion 19
-        targetSdkVersion 22
+        targetSdkVersion 26
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
@@ -26,6 +26,7 @@ android {
 //            path "CMakeLists.txt"
 //        }
 //    }
+//    buildToolsVersion '26.0.2'
 }
 
 dependencies {

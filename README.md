@@ -16,5 +16,17 @@
 					compile 'com.github.pdliugithub:DocumentScan:v1.0.1'
 			}
 
+3、Code:
+	//instance.
+	CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
+	//add.
+	getSupportFragmentManager().beginTransaction().add(R.id.container, cameraApiFragment, "api").commit();
+	//take picture callback.
+	cameraApiFragment.setTakePictureCallback(new TakePictureCallback() {
+			@Override
+			public void call(Bitmap bitmap) {
+				showImg.setImageBitmap(bitmap);
+			}
+		});
 
 [![](https://jitpack.io/v/pdliugithub/DocumentScan.svg)](https://jitpack.io/#pdliugithub/DocumentScan)
