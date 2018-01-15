@@ -13,10 +13,11 @@
 2、Add it in your root build.gradle at the end of repositories:
 
 			dependencies {
-					compile 'com.github.pdliugithub:DocumentScan:v1.0.1'
+					compile 'com.github.pdliugithub:DocumentScan:v1.0.2'
 			}
 
 3、Code:
+
 	//instance.
 	CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
 
