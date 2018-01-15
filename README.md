@@ -19,8 +19,10 @@
 3、Code:
 	//instance.
 	CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
+
 	//add.
 	getSupportFragmentManager().beginTransaction().add(R.id.container, cameraApiFragment, "api").commit();
+
 	//take picture callback.
 	cameraApiFragment.setTakePictureCallback(new TakePictureCallback() {
 			@Override
