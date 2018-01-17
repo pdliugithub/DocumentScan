@@ -20,6 +20,7 @@ import android.support.v4.app.Fragment;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,6 +41,7 @@ import com.rossia.life.scan.tensor.interf.Classifier;
 import com.rossia.life.scan.tensor.tracking.MultiBoxTracker;
 import com.rossia.life.scan.tensor.widget.OverlayView;
 import com.rossia.life.scan.tensor.widget.ScanImageView;
+import com.rossia.life.scan.transfer.SensorMoveControl;
 import com.rossia.life.scan.ui.interf.TakePictureCallback;
 import com.rossia.life.scan.ui.view.DrawColorView;
 
@@ -57,8 +59,8 @@ import java.util.List;
  *         拍照 {@link #takePicture(RectF)}
  *         点击TextureView，进行自动对焦
  *         当拍照完成后，进行扫描图片效果展示
- *         增加：自动拍照模式下：当识别出来的区域在离屏幕边缘小于 {@link #DETECTION_FROM_EDGE_DISTANCE} 时，视为不准确.
  *         增加：对检测的区域进行反复的学习、检查
+ *         增加：自动拍照模式下，手机移动时不进行拍照
  *         </p>
  *         <p>
  *         Note:
@@ -71,11 +73,10 @@ public class CameraApiFragment extends Fragment {
 
     private static final String TAG_LOG = "CameraApiFragment";
 
-    private static final int ROTATION_90 = 90;
     /**
-     * 识别出来的对象边缘距离屏幕的边缘小于这个值，视为不准确.
+     * 传感器控制者用于检测手机移动状态
      */
-    private static final int DETECTION_FROM_EDGE_DISTANCE = 30;
+    private SensorMoveControl mSensorMoveControl;
 
     /**
      * 渴望的、想得到的预览尺寸
@@ -267,7 +268,7 @@ public class CameraApiFragment extends Fragment {
                 mPreviewHeight = previewSize.height;
                 mPreviewWidth = previewSize.width;
                 mRgbBytes = new int[mPreviewWidth * mPreviewHeight];
-                onPreviewSizeChosen(new Size(mPreviewWidth, mPreviewHeight), ROTATION_90);
+                onPreviewSizeChosen(new Size(mPreviewWidth, mPreviewHeight), ScreenUtil.getDisplayOrientation(getActivity()));
             }
 
             mIsProcessingFrame = true;
@@ -350,6 +351,18 @@ public class CameraApiFragment extends Fragment {
             parameters.setPictureFormat(ImageFormat.JPEG);
             //设置照片质量[0 - 100 质量依次上升](为了达到订单的最大清晰度，设置质量为最大)
             parameters.setJpegQuality(100);
+
+            List<Camera.Size> pictureSizes = parameters.getSupportedPictureSizes();
+            int maxPictureWidth = 0;
+            int maxPictureHeight = 0;
+            for (Camera.Size pictureSize :
+                    pictureSizes) {
+                if (pictureSize.width > maxPictureWidth && pictureSize.height > maxPictureHeight) {
+                    maxPictureWidth = pictureSize.width;
+                    maxPictureHeight = pictureSize.height;
+                }
+            }
+            LogUtil.e(TAG_LOG, "picture size: width" + maxPictureWidth + "\theight:\t" + maxPictureHeight);
             parameters.setPictureSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
             mCamera.setParameters(parameters);
 
@@ -425,6 +438,11 @@ public class CameraApiFragment extends Fragment {
             //拍照完成后，重启预览功能.
             mCamera.startPreview();
 
+            if (mOpenCameraFlashLight) {
+                //更新闪光灯设置[拍照时，会默认关闭手电筒，所以，如过想要重新打开手电筒，需要：先关闭，再开启]
+                startFlash(false);
+                startFlash(true);
+            }
 
             //拍照完成后，将标记置为false
             mProcessTakePictureFlag = false;
@@ -451,13 +469,6 @@ public class CameraApiFragment extends Fragment {
             mDetectScreenLocationRectF = rectF;
 
             /*
-            加入识别物体与屏幕的最短距离的限制
-             */
-            if (mDetectScreenLocationRectF.left < DETECTION_FROM_EDGE_DISTANCE
-                    || mDetectScreenLocationRectF.top < DETECTION_FROM_EDGE_DISTANCE) {
-                return false;
-            }
-            /*
             这里处理自动拍照、拍照逻辑
              */
             if (mOpenAutoTakePicture) {
@@ -468,15 +479,14 @@ public class CameraApiFragment extends Fragment {
                 float intervalBottom = Math.abs(mDetectScreenLocationRectF.bottom - mPreDetectScreenLocationRectF.bottom);
 
 
-
                 if (intervalLeft <= mDetectionInterval && intervalTop <= mDetectionInterval && intervalRight <= mDetectionInterval && intervalBottom <= mDetectionInterval) {
 
                     /*
                     符合规则，进行计算值加一
                     当计算值累加到TAKE_CALCULATE_NUMBER时，进行拍照
                      */
-                    mAutoTakeCalculateNumber ++;
-                    if(mAutoTakeCalculateNumber < TAKE_CALCULATE_NUMBER){
+                    mAutoTakeCalculateNumber++;
+                    if (mAutoTakeCalculateNumber < TAKE_CALCULATE_NUMBER) {
                         return false;
                     }
                     /*
@@ -491,7 +501,7 @@ public class CameraApiFragment extends Fragment {
                     //自动拍照
                     mTakePictureImg.performClick();
                     mTakePictureImg.setPressed(true);
-                }else{
+                } else {
                     /*
                     只要有一次不符合规则，就进行重置为0
                      */
@@ -510,6 +520,8 @@ public class CameraApiFragment extends Fragment {
             mDrawColorView.draw(new DrawColorView.DrawColorListener() {
                 @Override
                 public void drawColor(Canvas canvas) {
+                    //当没有检测出文档时，进行重置自动拍照检测的计算值为0
+                    mAutoTakeCalculateNumber = 0;
                     float textSize = 50f;
                     Paint mPaint = new Paint();
                     mPaint.setAntiAlias(true);
@@ -583,7 +595,51 @@ public class CameraApiFragment extends Fragment {
         super.onResume();
 
         startCamera();
+
+        mSensorMoveControl = SensorMoveControl.newInstance(getContext());
+        mSensorMoveControl.startSensor();
+        mSensorMoveControl.setSensorMoveListener(mSensorMoveListener);
     }
+
+    /**
+     * 监听当前设备的移动状态
+     */
+    private SensorMoveControl.SensorMoveListener mSensorMoveListener = new SensorMoveControl.SensorMoveListener() {
+        @Override
+        public void onMoving() {
+            //当手机移动，就开始将自动拍照的计算次数置为0.
+            String tip = "";
+            if (mAutoTakeCalculateNumber == 0) {
+                tip = "请将识别文档置与屏幕中间，并减少干扰";
+            } else {
+                tip = "识别中，请减少移动手机";
+            }
+            final String tipDrawed = tip;
+
+            mAutoTakeCalculateNumber = 0;
+            mDrawColorView.draw(new DrawColorView.DrawColorListener() {
+                @Override
+                public void drawColor(Canvas canvas) {
+                    float textSize = 50f;
+                    Paint mPaint = new Paint();
+                    mPaint.setAntiAlias(true);
+                    mPaint.setColor(Color.BLACK);
+                    mPaint.setTextSize(textSize);
+
+                    float x = mTextureView.getWidth() / 2f - textSize * tipDrawed.length() / 2f;
+                    float y = mTextureView.getHeight() / 2f;
+                    canvas.drawText(tipDrawed, x, y, mPaint);
+                }
+            });
+        }
+
+        @Override
+        public void onStaticing() {
+            //当手机静止后，进行对焦
+            //Camera设置的自动对焦已经带有对焦功能了
+            return;
+        }
+    };
 
     public void startCamera() {
         mHandlerThread = new HandlerThread("inference");
@@ -601,13 +657,9 @@ public class CameraApiFragment extends Fragment {
     public void onPause() {
         super.onPause();
         stopCamera();
+        mSensorMoveControl.stopSensor();
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        stopCamera();
-    }
 
     public void runInBackground(Runnable runnable) {
         mBackgroundHandler.post(runnable);
@@ -783,12 +835,28 @@ public class CameraApiFragment extends Fragment {
     }
 
     /**
-     * 关闭相机
+     * <p>
+     * 关闭相机：停止预览、Thread退出、Handler移除消息.
+     * </p>
      */
     public void stopCamera() {
         if (mCamera != null) {
             mCamera.stopPreview();
-            mCamera.setPreviewCallback(null);
+            mHandlerThread.quitSafely();
+            mBackgroundHandler.removeCallbacksAndMessages(null);
+        }
+    }
+
+    /**
+     * <p>
+     * 释放相机资源
+     * </p>
+     */
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mCamera != null) {
+            mCamera.release();
         }
     }
 
@@ -824,18 +892,6 @@ public class CameraApiFragment extends Fragment {
                 return;
             }
 
-            if (mTextureView == v) {
-                /*
-                进行对焦
-                 */
-                mCamera.autoFocus(new Camera.AutoFocusCallback() {
-                    @Override
-                    public void onAutoFocus(boolean success, Camera camera) {
-                        mCamera.cancelAutoFocus();
-                    }
-                });
-                return;
-            }
 
         }
     };
@@ -847,6 +903,7 @@ public class CameraApiFragment extends Fragment {
      * @return 是否成功执行
      */
     public boolean startFlash(boolean open) {
+        LogUtil.e(TAG_LOG, "startFlash: " + open);
         //切换闪光灯ON OFF
         CameraUtil.startFlash(mCamera, open);
 
@@ -916,7 +973,7 @@ public class CameraApiFragment extends Fragment {
                 int height = takePictureSource.getHeight();
 
                 Matrix matrix = new Matrix();
-                //旋转90度.
+                //将资源旋转与预览的角度相一致
                 matrix.postRotate(ScreenUtil.getDisplayOrientation(getActivity()), width / 2.0f, height / 2.0f);
                 //旋转正常角度后的Bitmap.
                 Bitmap rotatedBitmap = Bitmap.createBitmap(takePictureSource, 0, 0, width, height, matrix, true);
@@ -974,13 +1031,17 @@ public class CameraApiFragment extends Fragment {
         mFocusPictureRect = rectF;
 
         /*
-            相机的对焦
-             */
+        相机的对焦
+        */
         //Applications should call autoFocus(AutoFocusCallback) to start the focus if focus mode is FOCUS_MODE_AUTO or FOCUS_MODE_MACRO.
         mCamera.autoFocus(mAutoFocusCallback);
         return true;
     }
 
+    /**
+     * 设置拍照完成后的Callback
+     * @param takePictureCallback {@link TakePictureCallback}
+     */
     public void setTakePictureCallback(TakePictureCallback takePictureCallback) {
         mTakePictureCallback = takePictureCallback;
     }

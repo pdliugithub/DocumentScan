@@ -1,7 +1,6 @@
 package com.rossia.life.scan.common.util;
 
 import android.app.Activity;
-import android.content.Context;
 import android.view.Surface;
 
 /**
@@ -15,9 +14,17 @@ public final class ScreenUtil {
     private ScreenUtil() {
     }
 
+    /**
+     * 获取当前手机旋转的角度，影响因素{portrait、landscape}
+     *
+     * @param activity activity.
+     * @return 当前手机旋转的角度
+     */
     public static int getScreenOrientation(Activity activity) {
 
-        switch (activity.getWindowManager().getDefaultDisplay().getRotation()) {
+        int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
+
+        switch (rotation) {
 
             case Surface.ROTATION_270:
                 return 270;
