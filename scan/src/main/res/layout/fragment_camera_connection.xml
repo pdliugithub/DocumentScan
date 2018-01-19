@@ -28,7 +28,7 @@
         android:layout_width="50dp"
         android:layout_height="50dp"
         android:layout_marginLeft="20dp"
-        android:layout_marginTop="@dimen/dimen_20dp"
+        android:layout_marginTop="@dimen/dimen_50dp"
         android:padding="10dp"
         android:src="@mipmap/scan_flash_off" />
 
@@ -38,7 +38,7 @@
         android:layout_height="50dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="@dimen/dimen_20dp"
+        android:layout_marginBottom="@dimen/dimen_50dp"
         android:background="@drawable/bg_take_picture" />
 
     <Switch

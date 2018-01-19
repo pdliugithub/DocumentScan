@@ -26,6 +26,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.Switch;
 import android.widget.Toast;
 
@@ -166,9 +167,14 @@ public class CameraApiFragment extends Fragment {
 
     private Classifier mTensorFlowObjectDetector;
 
-
+    /**
+     * 所拍照的Bitmap
+     */
     private Bitmap mTakePictureBitmap;
 
+    /**
+     * Background thread and handler.
+     */
     private HandlerThread mHandlerThread;
     private Handler mBackgroundHandler;
 
@@ -345,7 +351,7 @@ public class CameraApiFragment extends Fragment {
 
             //设置相机预览尺寸
             parameters.setPreviewSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
-            LogUtil.e(TAG_LOG, "preview size: width" + previewSizeMax.getWidth() + "\theight:\t" + previewSizeMax.getHeight());
+            LogUtil.e(TAG_LOG, "preview size: width" + previewSize.getWidth() + "\theight:\t" + previewSize.getHeight());
 
             //设置图片格式
             parameters.setPictureFormat(ImageFormat.JPEG);
@@ -1074,4 +1080,22 @@ public class CameraApiFragment extends Fragment {
         }
     };
 
+    public void setOpenAutoTakePicture(boolean autoTakePicture){
+        mOpenAutoTakePicture = autoTakePicture;
+    }
+    public boolean isOpenAutoTakePicture(){
+        return mOpenAutoTakePicture;
+    }
+
+    public void setTopViewMarginTop(int top){
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) mCameraScanFlashImg.getLayoutParams();
+        layoutParams.setMargins(0,top,0, 0);
+        mTakePictureImg.setLayoutParams(layoutParams);
+    }
+
+    public void setBottomMarginBottom(int bottom){
+        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) mTakePictureImg.getLayoutParams();
+        layoutParams.setMargins(0,0,0, bottom);
+        mTakePictureImg.setLayoutParams(layoutParams);
+    }
 }
