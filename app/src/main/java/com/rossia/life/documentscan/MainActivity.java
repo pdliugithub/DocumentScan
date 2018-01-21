@@ -2,6 +2,7 @@ package com.rossia.life.documentscan;
 
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -52,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
         final ImageView showImg = findViewById(R.id.show_img);
         mPhotoView = findViewById(R.id.photo_view);
 
-        CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
+        final CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
 
         getSupportFragmentManager().beginTransaction().add(R.id.container, cameraApiFragment, "api").commit();
 
@@ -73,6 +74,21 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         });
+
+        new Handler().post(new Runnable() {
+            @Override
+            public void run() {
+//                cameraApiFragment.setTopViewMarginTop(100);
+            }
+        });
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+
     }
 
     private View.OnClickListener mOnClick = new View.OnClickListener() {
