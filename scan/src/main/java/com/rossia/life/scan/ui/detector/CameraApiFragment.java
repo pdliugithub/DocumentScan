@@ -62,6 +62,7 @@ import java.util.List;
  *         当拍照完成后，进行扫描图片效果展示
  *         增加：对检测的区域进行反复的学习、检查
  *         增加：自动拍照模式下，手机移动时不进行拍照
+ *         增加：将拍照声音的设置方法公开性
  *         </p>
  *         <p>
  *         Note:
@@ -163,7 +164,6 @@ public class CameraApiFragment extends Fragment {
      * 自动拍选择按钮
      */
     private Switch mAutoTakePictureSwitch;
-    private Switch mShutterSoundTakePictureSwitch;
 
     private Classifier mTensorFlowObjectDetector;
 
@@ -423,10 +423,6 @@ public class CameraApiFragment extends Fragment {
                 mOpenAutoTakePicture = isChecked;
                 return;
             }
-            if (mShutterSoundTakePictureSwitch == buttonView) {
-                mOpenShutterSoundTakePicture = isChecked;
-                CameraUtil.startShutterSound(mCamera, mOpenShutterSoundTakePicture);
-            }
         }
     };
 
@@ -578,7 +574,6 @@ public class CameraApiFragment extends Fragment {
         mTrackingOverlay = view.findViewById(R.id.tracking_overlay);
         mTakePictureImg = view.findViewById(R.id.take_picture_btn);
         mAutoTakePictureSwitch = view.findViewById(R.id.auto_take_picture_switch);
-        mShutterSoundTakePictureSwitch = view.findViewById(R.id.shutter_sound_take_picture_switch);
         mPreviewTakeImg = view.findViewById(R.id.preview_take_img);
         mScanShowImg = view.findViewById(R.id.scan_img);
         mScanShowImg.setVisibility(View.GONE);
@@ -592,7 +587,6 @@ public class CameraApiFragment extends Fragment {
 
         //Check listener.
         mAutoTakePictureSwitch.setOnCheckedChangeListener(mOnCheckedChangeListener);
-        mShutterSoundTakePictureSwitch.setOnCheckedChangeListener(mOnCheckedChangeListener);
 
     }
 
@@ -1097,5 +1091,26 @@ public class CameraApiFragment extends Fragment {
         RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) mTakePictureImg.getLayoutParams();
         layoutParams.setMargins(0,0,0, bottom);
         mTakePictureImg.setLayoutParams(layoutParams);
+    }
+
+    public Camera getCamera(){
+        return mCamera;
+    }
+
+    /**
+     * 拍照声音状态
+     * @return 状态
+     */
+    public boolean isOpenShutterSoundTakePicture(){
+        return mOpenShutterSoundTakePicture;
+    }
+
+    /**
+     * 设置相机声音
+     * @param isOpen
+     */
+    public void setOpenShutterSoundTakePicture(boolean isOpen){
+        mOpenShutterSoundTakePicture = isOpen;
+        CameraUtil.startShutterSound(mCamera, mOpenShutterSoundTakePicture);
     }
 }

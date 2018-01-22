@@ -53,19 +53,7 @@
         android:text="自动拍"
         android:textColor="@color/white" />
 
-    <Switch
-        android:id="@+id/shutter_sound_take_picture_switch"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentRight="true"
-        android:layout_alignTop="@id/scan_flash_img"
-        android:background="@drawable/bg_auto_take_pick"
-        android:checked="true"
-        android:padding="@dimen/dimen_10dp"
-        android:shadowColor="#00ff00"
-        android:switchPadding="@dimen/dimen_5dp"
-        android:text="拍照声音"
-        android:textColor="@color/white" />
+
 
 
     <!-- 拍照后的图片在这里进行预览 -->
