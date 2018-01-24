@@ -20,13 +20,11 @@ import android.support.v4.app.Fragment;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
 import android.widget.Switch;
 import android.widget.Toast;
 
@@ -63,6 +61,7 @@ import java.util.List;
  *         增加：对检测的区域进行反复的学习、检查
  *         增加：自动拍照模式下，手机移动时不进行拍照
  *         增加：将拍照声音的设置方法公开性
+ *         增加：在子线程中打开相机预览
  *         </p>
  *         <p>
  *         Note:
@@ -83,7 +82,7 @@ public class CameraApiFragment extends Fragment {
     /**
      * 渴望的、想得到的预览尺寸
      */
-    private static final Size DESIRED_PREVIEW_SIZE = new Size(640, 480);
+    private static final Size DESIRED_PREVIEW_SIZE = new Size(800, 480);
 
     /**
      * 当前预览使用的Camera对象
@@ -109,6 +108,8 @@ public class CameraApiFragment extends Fragment {
 
     private Runnable mImageConverterRunnable;
     private Runnable mReadyForNextImageRunnable;
+
+    private Handler mHandler = new Handler();
 
     /**
      * 当前是否在进行处理图片Frame中
@@ -240,7 +241,9 @@ public class CameraApiFragment extends Fragment {
     private byte[] mLuminanceCopy;
 
     private Bitmap mCropCopyBitmap;
-
+    /**
+     * 识别出的边框之间的计算区域差
+     */
     private float mDetectionInterval = 50;
 
     /**
@@ -250,11 +253,26 @@ public class CameraApiFragment extends Fragment {
     private RectF mPreDetectScreenLocationRectF;
 
     /**
-     * 自动拍照时，进行需要计算精度的次数
+     * 自动拍照时，当前已经进行计算精度的次数
      */
     private int mAutoTakeCalculateNumber;
 
-    private static final int TAKE_CALCULATE_NUMBER = 50;
+
+    /**
+     * 上一次拍照的时间
+     */
+    private long mPreTakeTime;
+
+    /**
+     * 拍照进度框展示
+     */
+    ProgressDialog mProgressDialog;
+
+
+    /**
+     * 自动拍照时需要进行精度的确认的次数
+     */
+    private static final int TAKE_CALCULATE_NUMBER = 10;
     /**
      * Callback for android.hardware.Camera API.
      */
@@ -304,92 +322,153 @@ public class CameraApiFragment extends Fragment {
     };
 
 
+    /**
+     * 监听当前设备的移动状态
+     */
+    private SensorMoveControl.SensorMoveListener mSensorMoveListener = new SensorMoveControl.SensorMoveListener() {
+        @Override
+        public void onMoving() {
+            //当手机移动，就开始将自动拍照的计算次数置为0.
+            String tip = "";
+            if (mAutoTakeCalculateNumber == 0) {
+                tip = "请将识别文档置与屏幕中间，并减少干扰";
+            } else {
+                tip = "识别中，请减少移动手机";
+            }
+            final String tipDrawed = tip;
+
+            mAutoTakeCalculateNumber = 0;
+            mDrawColorView.draw(new DrawColorView.DrawColorListener() {
+                @Override
+                public void drawColor(Canvas canvas) {
+                    float textSize = 50f;
+                    Paint mPaint = new Paint();
+                    mPaint.setAntiAlias(true);
+                    mPaint.setColor(Color.BLACK);
+                    mPaint.setTextSize(textSize);
+
+                    float x = mTextureView.getWidth() / 2f - textSize * tipDrawed.length() / 2f;
+                    float y = mTextureView.getHeight() / 2f;
+                    canvas.drawText(tipDrawed, x, y, mPaint);
+                }
+            });
+        }
+
+        @Override
+        public void onStaticing() {
+            //当手机静止后，进行对焦
+            //Camera设置的自动对焦已经带有对焦功能了
+            return;
+        }
+    };
+
+
+    /**
+     * 初始化相机
+     *
+     * @param surface
+     * @param width
+     * @param height
+     */
+    private void initCamera(final SurfaceTexture surface, int width, int height) {
+        runInBackground(new Runnable() {
+            @Override
+            public void run() {
+                int cameraID = CameraUtil.getCameraId();
+                mCamera = Camera.open(cameraID);
+                LogUtil.e(TAG_LOG, "相机所开启的所在线程为:" + Thread.currentThread());
+
+                /*
+                配置相机的相关参数
+                 */
+                Camera.Parameters parameters = mCamera.getParameters();
+
+                parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
+
+                //支持的预览的尺寸
+                List<Camera.Size> supportCameraSizes = parameters.getSupportedPreviewSizes();
+
+                //获取所支持的最大的预览尺寸
+                Size previewSizeMax = null;
+
+                int maxWidthSize = 0;
+                int maxHeightSize = 0;
+                Size maxSize = new Size(0, 0);
+                for (Camera.Size size :
+                        supportCameraSizes) {
+                    if (size.width > maxWidthSize && size.height > maxHeightSize) {
+                        maxWidthSize = size.width;
+                        maxHeightSize = size.height;
+                    }
+                    LogUtil.e(TAG_LOG, "support size: width" + size.width + "\theight:\t" + size.height);
+                }
+
+                //最大预览
+                previewSizeMax = new Size(maxWidthSize, maxHeightSize);
+
+                List<Camera.Size> cameraSizes = parameters.getSupportedPreviewSizes();
+                Size[] sizes = new Size[cameraSizes.size()];
+                int i = 0;
+                for (Camera.Size size : cameraSizes) {
+                    sizes[i++] = new Size(size.width, size.height);
+                }
+                Size previewSize =
+                        CameraUtil.chooseOptimalSize(
+                                sizes, DESIRED_PREVIEW_SIZE.getWidth(), DESIRED_PREVIEW_SIZE.getHeight());
+
+                //设置相机预览尺寸
+                parameters.setPreviewSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
+                LogUtil.e(TAG_LOG, "preview size: width" + previewSizeMax.getWidth() + "\theight:\t" + previewSizeMax.getHeight());
+
+                //设置图片格式
+                parameters.setPictureFormat(ImageFormat.JPEG);
+                //设置照片质量[0 - 100 质量依次上升](为了达到订单的最大清晰度，设置质量为最大)
+                parameters.setJpegQuality(100);
+
+                List<Camera.Size> pictureSizes = parameters.getSupportedPictureSizes();
+                int maxPictureWidth = 0;
+                int maxPictureHeight = 0;
+                for (Camera.Size pictureSize :
+                        pictureSizes) {
+                    if (pictureSize.width > maxPictureWidth && pictureSize.height > maxPictureHeight) {
+                        maxPictureWidth = pictureSize.width;
+                        maxPictureHeight = pictureSize.height;
+                    }
+                }
+                LogUtil.e(TAG_LOG, "picture size: width" + maxPictureWidth + "\theight:\t" + maxPictureHeight);
+                parameters.setPictureSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
+                mCamera.setParameters(parameters);
+
+
+                //默认预览的图片是被旋转的，需要进行此行代码设置进行纠正
+                mCamera.setDisplayOrientation(ScreenUtil.getDisplayOrientation(getActivity()));
+
+                try {
+                    mCamera.setPreviewTexture(surface);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    mCamera.release();
+                }
+
+                mCamera.setPreviewCallbackWithBuffer(mCameraPreviewCallback);
+                Camera.Size cameraSize = mCamera.getParameters().getPreviewSize();
+                LogUtil.e(TAG_LOG, "cameraSize size: width" + cameraSize.height + "\theight:\t" + cameraSize.width);
+                //因为：DisplayOrientation 旋转90度，所以getYUVByteSize（width, height）;
+                mCamera.addCallbackBuffer(new byte[getYUVByteSize(cameraSize.height, cameraSize.width)]);
+                mCamera.startPreview();
+            }
+        });
+    }
+
+    /**
+     * SurfaceTextureListener.
+     */
     private TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-
-            int cameraID = CameraUtil.getCameraId();
-            mCamera = Camera.open(cameraID);
-
-            /*
-            配置相机的相关参数
-             */
-            Camera.Parameters parameters = mCamera.getParameters();
-
-            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-
-            //支持的预览的尺寸
-            List<Camera.Size> supportCameraSizes = parameters.getSupportedPreviewSizes();
-
-            //获取所支持的最大的预览尺寸
-            Size previewSizeMax = null;
-
-            int maxWidthSize = 0;
-            int maxHeightSize = 0;
-            Size maxSize = new Size(0, 0);
-            for (Camera.Size size :
-                    supportCameraSizes) {
-                if (size.width > maxWidthSize && size.height > maxHeightSize) {
-                    maxWidthSize = size.width;
-                    maxHeightSize = size.height;
-                }
-                LogUtil.e(TAG_LOG, "support size: width" + size.width + "\theight:\t" + size.height);
-            }
-
-            //最大预览
-            previewSizeMax = new Size(maxWidthSize, maxHeightSize);
-
-            List<Camera.Size> cameraSizes = parameters.getSupportedPreviewSizes();
-            Size[] sizes = new Size[cameraSizes.size()];
-            int i = 0;
-            for (Camera.Size size : cameraSizes) {
-                sizes[i++] = new Size(size.width, size.height);
-            }
-            Size previewSize =
-                    CameraUtil.chooseOptimalSize(
-                            sizes, DESIRED_PREVIEW_SIZE.getWidth(), DESIRED_PREVIEW_SIZE.getHeight());
-
-            //设置相机预览尺寸
-            parameters.setPreviewSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
-            LogUtil.e(TAG_LOG, "preview size: width" + previewSize.getWidth() + "\theight:\t" + previewSize.getHeight());
-
-            //设置图片格式
-            parameters.setPictureFormat(ImageFormat.JPEG);
-            //设置照片质量[0 - 100 质量依次上升](为了达到订单的最大清晰度，设置质量为最大)
-            parameters.setJpegQuality(100);
-
-            List<Camera.Size> pictureSizes = parameters.getSupportedPictureSizes();
-            int maxPictureWidth = 0;
-            int maxPictureHeight = 0;
-            for (Camera.Size pictureSize :
-                    pictureSizes) {
-                if (pictureSize.width > maxPictureWidth && pictureSize.height > maxPictureHeight) {
-                    maxPictureWidth = pictureSize.width;
-                    maxPictureHeight = pictureSize.height;
-                }
-            }
-            LogUtil.e(TAG_LOG, "picture size: width" + maxPictureWidth + "\theight:\t" + maxPictureHeight);
-            parameters.setPictureSize(previewSizeMax.getWidth(), previewSizeMax.getHeight());
-            mCamera.setParameters(parameters);
-
-
-            //默认预览的图片是被旋转的，需要进行此行代码设置进行纠正
-            mCamera.setDisplayOrientation(ScreenUtil.getDisplayOrientation(getActivity()));
-
-            try {
-                mCamera.setPreviewTexture(surface);
-
-            } catch (IOException e) {
-                e.printStackTrace();
-                mCamera.release();
-            }
-
-            mCamera.setPreviewCallbackWithBuffer(mCameraPreviewCallback);
-            Camera.Size cameraSize = mCamera.getParameters().getPreviewSize();
-            LogUtil.e(TAG_LOG, "cameraSize size: width" + cameraSize.height + "\theight:\t" + cameraSize.width);
-            //因为：DisplayOrientation 旋转90度，所以getYUVByteSize（width, height）;
-            mCamera.addCallbackBuffer(new byte[getYUVByteSize(cameraSize.height, cameraSize.width)]);
-            mCamera.startPreview();
+            //初始化相机
+            initCamera(surface, width, height);
         }
 
         @Override
@@ -408,7 +487,9 @@ public class CameraApiFragment extends Fragment {
         }
     };
 
-
+    /**
+     * Constructor
+     */
     private CameraApiFragment() {
     }
 
@@ -474,7 +555,10 @@ public class CameraApiFragment extends Fragment {
             这里处理自动拍照、拍照逻辑
              */
             if (mOpenAutoTakePicture) {
-
+                if (mPreDetectScreenLocationRectF == null || mDetectScreenLocationRectF == null) {
+                    LogUtil.e(TAG_LOG, "识别的出的局域对象为空");
+                    return false;
+                }
                 float intervalLeft = Math.abs(mDetectScreenLocationRectF.left - mPreDetectScreenLocationRectF.left);
                 float intervalTop = Math.abs(mDetectScreenLocationRectF.top - mPreDetectScreenLocationRectF.top);
                 float intervalRight = Math.abs(mDetectScreenLocationRectF.right - mPreDetectScreenLocationRectF.right);
@@ -488,6 +572,7 @@ public class CameraApiFragment extends Fragment {
                     当计算值累加到TAKE_CALCULATE_NUMBER时，进行拍照
                      */
                     mAutoTakeCalculateNumber++;
+                    LogUtil.e(TAG_LOG, "自动拍照计算值：" + mAutoTakeCalculateNumber);
                     if (mAutoTakeCalculateNumber < TAKE_CALCULATE_NUMBER) {
                         return false;
                     }
@@ -501,6 +586,7 @@ public class CameraApiFragment extends Fragment {
                     }
                     mAutoTakeCalculateNumber = 0;
                     //自动拍照
+                    LogUtil.e(TAG_LOG, "自动拍照触发拍照");
                     mTakePictureImg.performClick();
                     mTakePictureImg.setPressed(true);
                 } else {
@@ -518,6 +604,8 @@ public class CameraApiFragment extends Fragment {
     private MultiBoxTracker.DetectionNothingCallback mDetectionNothingCallback = new MultiBoxTracker.DetectionNothingCallback() {
         @Override
         public boolean call() {
+            //没有识别出相应的物体
+            mDetectScreenLocationRectF = null;
             //画面变灰色
             mDrawColorView.draw(new DrawColorView.DrawColorListener() {
                 @Override
@@ -541,6 +629,11 @@ public class CameraApiFragment extends Fragment {
         }
     };
 
+    /**
+     * New CameraApiFragment instance.
+     *
+     * @return instance.
+     */
     public static CameraApiFragment newInstance() {
 
         CameraApiFragment fragment = new CameraApiFragment();
@@ -601,46 +694,6 @@ public class CameraApiFragment extends Fragment {
         mSensorMoveControl.setSensorMoveListener(mSensorMoveListener);
     }
 
-    /**
-     * 监听当前设备的移动状态
-     */
-    private SensorMoveControl.SensorMoveListener mSensorMoveListener = new SensorMoveControl.SensorMoveListener() {
-        @Override
-        public void onMoving() {
-            //当手机移动，就开始将自动拍照的计算次数置为0.
-            String tip = "";
-            if (mAutoTakeCalculateNumber == 0) {
-                tip = "请将识别文档置与屏幕中间，并减少干扰";
-            } else {
-                tip = "识别中，请减少移动手机";
-            }
-            final String tipDrawed = tip;
-
-            mAutoTakeCalculateNumber = 0;
-            mDrawColorView.draw(new DrawColorView.DrawColorListener() {
-                @Override
-                public void drawColor(Canvas canvas) {
-                    float textSize = 50f;
-                    Paint mPaint = new Paint();
-                    mPaint.setAntiAlias(true);
-                    mPaint.setColor(Color.BLACK);
-                    mPaint.setTextSize(textSize);
-
-                    float x = mTextureView.getWidth() / 2f - textSize * tipDrawed.length() / 2f;
-                    float y = mTextureView.getHeight() / 2f;
-                    canvas.drawText(tipDrawed, x, y, mPaint);
-                }
-            });
-        }
-
-        @Override
-        public void onStaticing() {
-            //当手机静止后，进行对焦
-            //Camera设置的自动对焦已经带有对焦功能了
-            return;
-        }
-    };
-
     public void startCamera() {
         mHandlerThread = new HandlerThread("inference");
         mHandlerThread.start();
@@ -658,11 +711,25 @@ public class CameraApiFragment extends Fragment {
         super.onPause();
         stopCamera();
         mSensorMoveControl.stopSensor();
+        mHandler.removeCallbacksAndMessages(null);
     }
 
-
+    /**
+     * 在子线程中进行执行任务
+     *
+     * @param runnable task
+     */
     public void runInBackground(Runnable runnable) {
         mBackgroundHandler.post(runnable);
+    }
+
+    /**
+     * 在UI线程中进行执行任务
+     *
+     * @param runnable task
+     */
+    public void runInMain(Runnable runnable) {
+        mHandler.post(runnable);
     }
 
     /**
@@ -879,7 +946,12 @@ public class CameraApiFragment extends Fragment {
                 /*
                 进行拍照
                  */
-                takePictureFocus(mDetectScreenLocationRectF);
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        takePictureFocus(mDetectScreenLocationRectF);
+                    }
+                });
                 return;
             }
 
@@ -929,12 +1001,6 @@ public class CameraApiFragment extends Fragment {
         return true;
     }
 
-
-    private long mPreTakeTime;
-
-
-    ProgressDialog mProgressDialog;
-
     /**
      * 拍照
      *
@@ -949,12 +1015,17 @@ public class CameraApiFragment extends Fragment {
                 /*
                 这里加入识别成功滴一声
                  */
-                if (mProgressDialog == null) {
-                    mProgressDialog = new ProgressDialog(getContext());
-                    mProgressDialog.setMessage("加载图片中....");
-                    mProgressDialog.create();
-                }
-                mProgressDialog.show();
+                runInMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mProgressDialog == null) {
+                            mProgressDialog = new ProgressDialog(getContext());
+                            mProgressDialog.setMessage("加载图片中....");
+                            mProgressDialog.create();
+                        }
+                        mProgressDialog.show();
+                    }
+                });
             }
         }, null, null, new Camera.PictureCallback() {
             @Override
@@ -1003,11 +1074,16 @@ public class CameraApiFragment extends Fragment {
                 }
 
                 //取消加载进度框
-                mProgressDialog.cancel();
-                mScanShowImg.setImageBitmap(mTakePictureBitmap);
-                mScanShowImg.setVisibility(View.VISIBLE);
+                runInMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        mProgressDialog.cancel();
+                        mScanShowImg.setImageBitmap(mTakePictureBitmap);
+                        mScanShowImg.setVisibility(View.VISIBLE);
+                    }
+                });
+                //开启扫描效果
                 mScanShowImg.startScan();
-
 
             }
         });
@@ -1040,6 +1116,7 @@ public class CameraApiFragment extends Fragment {
 
     /**
      * 设置拍照完成后的Callback
+     *
      * @param takePictureCallback {@link TakePictureCallback}
      */
     public void setTakePictureCallback(TakePictureCallback takePictureCallback) {
@@ -1074,42 +1151,34 @@ public class CameraApiFragment extends Fragment {
         }
     };
 
-    public void setOpenAutoTakePicture(boolean autoTakePicture){
+    public void setOpenAutoTakePicture(boolean autoTakePicture) {
         mOpenAutoTakePicture = autoTakePicture;
     }
-    public boolean isOpenAutoTakePicture(){
+
+    public boolean isOpenAutoTakePicture() {
         return mOpenAutoTakePicture;
     }
 
-    public void setTopViewMarginTop(int top){
-        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) mCameraScanFlashImg.getLayoutParams();
-        layoutParams.setMargins(0,top,0, 0);
-        mTakePictureImg.setLayoutParams(layoutParams);
-    }
 
-    public void setBottomMarginBottom(int bottom){
-        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) mTakePictureImg.getLayoutParams();
-        layoutParams.setMargins(0,0,0, bottom);
-        mTakePictureImg.setLayoutParams(layoutParams);
-    }
-
-    public Camera getCamera(){
+    public Camera getCamera() {
         return mCamera;
     }
 
     /**
      * 拍照声音状态
+     *
      * @return 状态
      */
-    public boolean isOpenShutterSoundTakePicture(){
+    public boolean isOpenShutterSoundTakePicture() {
         return mOpenShutterSoundTakePicture;
     }
 
     /**
      * 设置相机声音
+     *
      * @param isOpen
      */
-    public void setOpenShutterSoundTakePicture(boolean isOpen){
+    public void setOpenShutterSoundTakePicture(boolean isOpen) {
         mOpenShutterSoundTakePicture = isOpen;
         CameraUtil.startShutterSound(mCamera, mOpenShutterSoundTakePicture);
     }
