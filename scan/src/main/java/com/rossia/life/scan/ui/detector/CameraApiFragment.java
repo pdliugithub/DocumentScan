@@ -946,12 +946,12 @@ public class CameraApiFragment extends Fragment {
                 /*
                 进行拍照
                  */
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
+//                mHandler.post(new Runnable() {
+//                    @Override
+//                    public void run() {
                         takePictureFocus(mDetectScreenLocationRectF);
-                    }
-                });
+//                    }
+//                });
                 return;
             }
 
@@ -1012,20 +1012,7 @@ public class CameraApiFragment extends Fragment {
         mCamera.takePicture(new Camera.ShutterCallback() {
             @Override
             public void onShutter() {
-                /*
-                这里加入识别成功滴一声
-                 */
-                runInMain(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (mProgressDialog == null) {
-                            mProgressDialog = new ProgressDialog(getContext());
-                            mProgressDialog.setMessage("加载图片中....");
-                            mProgressDialog.create();
-                        }
-                        mProgressDialog.show();
-                    }
-                });
+
             }
         }, null, null, new Camera.PictureCallback() {
             @Override
@@ -1077,7 +1064,10 @@ public class CameraApiFragment extends Fragment {
                 runInMain(new Runnable() {
                     @Override
                     public void run() {
-                        mProgressDialog.cancel();
+                        if(mProgressDialog != null){
+                            mProgressDialog.cancel();
+                            mProgressDialog = null;
+                        }
                         mScanShowImg.setImageBitmap(mTakePictureBitmap);
                         mScanShowImg.setVisibility(View.VISIBLE);
                     }
@@ -1110,6 +1100,15 @@ public class CameraApiFragment extends Fragment {
         相机的对焦
         */
         //Applications should call autoFocus(AutoFocusCallback) to start the focus if focus mode is FOCUS_MODE_AUTO or FOCUS_MODE_MACRO.
+        /*
+        这里加入识别成功滴一声
+        */
+        if (mProgressDialog == null) {
+            mProgressDialog = new ProgressDialog(getContext());
+            mProgressDialog.setMessage("加载图片中....");
+            mProgressDialog.create();
+        }
+        mProgressDialog.show();
         mCamera.autoFocus(mAutoFocusCallback);
         return true;
     }
