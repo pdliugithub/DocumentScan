@@ -18,7 +18,7 @@
 
 3、Code:
 
-	//instance.
+	//Create instance.
 	CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
 
 	//add.
