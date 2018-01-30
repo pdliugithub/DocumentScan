@@ -26,6 +26,8 @@ public class MainActivity extends AppCompatActivity {
 
     private Bitmap mTakePictureBitmap;
 
+    private CameraApiFragment mCameraApiFragment;
+
     /**
      * 对图片进行、对比度的加强
      */
@@ -53,11 +55,11 @@ public class MainActivity extends AppCompatActivity {
         final ImageView showImg = findViewById(R.id.show_img);
         mPhotoView = findViewById(R.id.photo_view);
 
-        final CameraApiFragment cameraApiFragment = CameraApiFragment.newInstance();
+        mCameraApiFragment = CameraApiFragment.newInstance();
 
-        getSupportFragmentManager().beginTransaction().add(R.id.container, cameraApiFragment, "api").commit();
+        getSupportFragmentManager().beginTransaction().add(R.id.container, mCameraApiFragment, "api").commit();
 
-        cameraApiFragment.setTakePictureCallback(new TakePictureCallback() {
+        mCameraApiFragment.setTakePictureCallback(new TakePictureCallback() {
             @Override
             public void call(Bitmap bitmap) {
                 mTakePictureBitmap = bitmap;
@@ -88,7 +90,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        mCameraApiFragment.startDetect();
+    }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mCameraApiFragment.stopDetect();
     }
 
     private View.OnClickListener mOnClick = new View.OnClickListener() {

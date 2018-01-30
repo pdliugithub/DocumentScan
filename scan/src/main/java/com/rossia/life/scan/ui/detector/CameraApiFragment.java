@@ -56,6 +56,8 @@ import java.util.List;
  *         <p>
  *         Usage
  *         拍照 {@link #takePicture(RectF)}
+ *         开启预览检测功能 {@link #startDetect()} .
+ *         关闭预览检测功能 {@link #stopDetect()} .
  *         点击TextureView，进行自动对焦
  *         当拍照完成后，进行扫描图片效果展示
  *         增加：对检测的区域进行反复的学习、检查
@@ -523,8 +525,13 @@ public class CameraApiFragment extends Fragment {
 
             if (mOpenCameraFlashLight) {
                 //更新闪光灯设置[拍照时，会默认关闭手电筒，所以，如过想要重新打开手电筒，需要：先关闭，再开启]
-                startFlash(false);
-                startFlash(true);
+                if(startFlash(false)){
+                    switchFlashImageView(false);
+                }
+                if(startFlash(true)){
+                    switchFlashImageView(true);
+                }
+
             }
 
             //拍照完成后，将标记置为false
@@ -683,18 +690,21 @@ public class CameraApiFragment extends Fragment {
 
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-
+    /**
+     * 开始进行检测
+     *
+     */
+    public void startDetect(){
+        //Start camera display.
         startCamera();
 
+        //Start sensor.
         mSensorMoveControl = SensorMoveControl.newInstance(getContext());
         mSensorMoveControl.startSensor();
         mSensorMoveControl.setSensorMoveListener(mSensorMoveListener);
     }
 
-    public void startCamera() {
+    private void startCamera() {
         mHandlerThread = new HandlerThread("inference");
         mHandlerThread.start();
         mBackgroundHandler = new Handler(mHandlerThread.getLooper());
@@ -706,11 +716,16 @@ public class CameraApiFragment extends Fragment {
         }
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
+    /**
+     * 停止进行检测
+     */
+    public void stopDetect(){
+        //Stop camera display.
         stopCamera();
+
+        //Stop sensor.
         mSensorMoveControl.stopSensor();
+        //Remove all callbacks and message.
         mHandler.removeCallbacksAndMessages(null);
     }
 
@@ -906,7 +921,7 @@ public class CameraApiFragment extends Fragment {
      * 关闭相机：停止预览、Thread退出、Handler移除消息.
      * </p>
      */
-    public void stopCamera() {
+    private void stopCamera() {
         if (mCamera != null) {
             mCamera.stopPreview();
             mHandlerThread.quitSafely();
@@ -938,7 +953,10 @@ public class CameraApiFragment extends Fragment {
                 /*
                 切换闪光灯
                  */
-                startFlash(!mOpenCameraFlashLight);
+                boolean isFlash = !mOpenCameraFlashLight;
+                if(startFlash(isFlash)){
+                    switchFlashImageView(isFlash);
+                }
                 return;
             }
 
@@ -977,9 +995,12 @@ public class CameraApiFragment extends Fragment {
     public boolean startFlash(boolean open) {
         LogUtil.e(TAG_LOG, "startFlash: " + open);
         //切换闪光灯ON OFF
-        CameraUtil.startFlash(mCamera, open);
+        boolean isStarted = CameraUtil.startFlash(mCamera, open);
+        if(isStarted){
+            mOpenCameraFlashLight = open;
+        }
 
-        return switchFlashImageView(open);
+        return isStarted;
     }
 
     /**
@@ -992,7 +1013,7 @@ public class CameraApiFragment extends Fragment {
         if (mCameraScanFlashImg == null) {
             return false;
         }
-        mOpenCameraFlashLight = open;
+
         if (open) {
             mCameraScanFlashImg.setImageResource(R.mipmap.scan_flash_on);
         } else {
@@ -1085,7 +1106,7 @@ public class CameraApiFragment extends Fragment {
     /**
      * 拍照前进行自动对焦，对焦完成之后再进行拍照
      */
-    private boolean takePictureFocus(@Nullable final RectF rectF) {
+    public boolean takePictureFocus(@Nullable final RectF rectF) {
         if (mProcessTakePictureFlag) {
             //已经正在拍照中，避免重复操作，不往下进行
             return false;
@@ -1150,6 +1171,10 @@ public class CameraApiFragment extends Fragment {
         }
     };
 
+    /**
+     * 切换自动拍照的功能
+     * @param autoTakePicture
+     */
     public void setOpenAutoTakePicture(boolean autoTakePicture) {
         mOpenAutoTakePicture = autoTakePicture;
     }
